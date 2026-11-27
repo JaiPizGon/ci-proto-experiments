@@ -1,0 +1,1396 @@
+<title>ci-proto Results Report</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: single reading column with a compact contents rail; wide tables scroll in place. */
+:root{--bg:#f7f8fa;--surface:#ffffff;--fg:#1b2430;--muted:#5a6676;--line:#dde2ea;--accent:#1f6f8b;--accent-soft:#e3f0f4;
+--display:"Space Grotesk",system-ui,sans-serif;--text:"Inter",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#11161d;--surface:#171e27;--fg:#e4e9f0;--muted:#9aa6b6;--line:#2a3442;--accent:#6cc1dd;--accent-soft:#1b2e38;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#11161d;--surface:#171e27;--fg:#e4e9f0;--muted:#9aa6b6;--line:#2a3442;--accent:#6cc1dd;--accent-soft:#1b2e38;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--text);font-size:15.5px;line-height:1.6;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+.wrap{max-width:1040px;margin:0 auto;padding-block:40px 80px}
+header{padding-bottom:20px;border-bottom:1px solid var(--line);margin-bottom:28px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font-family:var(--display);font-size:clamp(26px,4vw,38px);line-height:1.15;margin:.3em 0 .2em;text-wrap:balance}
+h2{font-family:var(--display);font-size:23px;margin:2.2em 0 .6em;padding-top:.6em;border-top:1px solid var(--line);text-wrap:balance}
+h3{font-family:var(--display);font-size:18px;margin:1.6em 0 .4em}
+p,li{max-width:78ch}
+a{color:var(--accent)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+code{font-family:var(--mono);font-size:.86em;background:var(--accent-soft);padding:.08em .35em;border-radius:4px}
+nav.toc{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 18px;margin:0 0 8px}
+nav.toc strong{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+nav.toc ol{columns:2 260px;margin:.5em 0 0;padding-left:1.1em}
+nav.toc li{font-size:14px}
+.tw{overflow-x:auto;margin:1em 0 1.4em;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-family:var(--text);font-weight:600;color:var(--muted);background:var(--accent-soft);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+hr{border:0;border-top:1px solid var(--line);margin:2em 0}
+strong{font-weight:650}
+@media (max-width:600px){body{font-size:15px}h2{font-size:20px}}
+</style>
+<div class="wrap">
+<header><div class="eyebrow">Zero-shot TSFM evaluation · E1–E10 · full run</div>
+<h1>ci-proto — findings report for the paper (full run, 18–26 Nov 2026)</h1></header>
+<nav class="toc"><strong>Contents</strong><ol><li><a href="#1-headline-findings">1. Headline findings</a></li><li><a href="#2-e1-general-benchmarks">2. E1 — General benchmarks</a></li><li><a href="#3-e10-gift-eval-97-configurations">3. E10 — GIFT-Eval (97 configurations)</a></li><li><a href="#4-e2-leakage-control">4. E2 — Leakage control</a></li><li><a href="#5-e3-electricity-prices">5. E3 — Electricity prices</a></li><li><a href="#6-e4-covariates-and-calendar-features">6. E4 — Covariates and calendar features</a></li><li><a href="#7-e5-context-scaling-uci-household-power">7. E5 — Context scaling (UCI household power, 1-min, about 2.07 M points)</a></li><li><a href="#8-e6-data-scarcity-beijing-multi-site-pm">8. E6 — Data scarcity (Beijing multi-site PM2.5)</a></li><li><a href="#9-e7-ablations-and-missing-data">9. E7 — Ablations and missing data</a></li><li><a href="#10-probabilistic-forecast-tests">10. Probabilistic forecast tests</a></li><li><a href="#11-e8-inference-cost-rtx-4070-laptop-8-g">11. E8 — Inference cost (RTX 4070 Laptop, 8 GB)</a></li><li><a href="#12-e9-volatility-negative-control">12. E9 — Volatility (negative control)</a></li><li><a href="#13-validity-limitations-and-open-items">13. Validity, limitations and open items</a></li><li><a href="#14-suggested-claims-for-the-paper">14. Suggested claims for the paper</a></li></ol></nav>
+<p>This report covers the full experimental run of ci-proto, a 167 M-parameter zero-shot probabilistic TSFM: TiRex-2 with a bidirectional Mamba-3 time mixer. It covers E1–E10, the probabilistic-forecast tests and the inference-cost study. Every number below comes from a file in <code>results/</code>. File paths are given so each table can be traced. Protocol deviations and bug fixes made during the run are documented in <code>docs/PROTOCOL_CHANGES.md</code> (sections 1–13).</p>
+<blockquote>
+<p><strong>Update 2026-11-27: gap reruns complete.</strong> Every cell that the CUDA-driver fault had voided in E5 and E7 has been recomputed (PROTOCOL_CHANGES §14):
+- E5: ci-proto at 262 k and 524 k context (both horizons).
+- E7: ci-proto missing data on ETTh1 and Beijing, the independent mode, the six TTA flags, and fp32 on ETTh1.</p>
+<p>The only remaining gap is ci-proto at ≥ 1 M context in E5, which runs out of memory on the 8 GB GPU when calendar features are on. No number in this report is imputed or estimated.</p>
+</blockquote>
+<p><strong>Set-up.</strong>
+- Hardware and software: one RTX 4070 Laptop GPU (8 GB) under WSL2, torch 2.14 + CUDA 13.0.
+- Comparators: Chronos-2, TimesFM-3, TimesFM-2.5, TiRex-2, TiRex, Moirai-2, plus task-specific statistical and supervised baselines.
+- All TSFMs run zero-shot. Where a model's native window is shorter than the requested context, inputs are truncated to it.
+- Lower is better for every error metric. COV80 should be 0.80.</p>
+<hr />
+<h2 id="1-headline-findings">1. Headline findings</h2>
+<ol>
+<li><strong>Point and probabilistic accuracy is at the top of the field, but the margin is small and test-dependent.</strong>
+   - ci-proto ranks first on the leakage-free synthetic suite (E2), the long-horizon benchmarks (E1 ETT/large LTSF) and fev-bench (among our re-runs). It is second on GIFT-Eval and best on most hourly electricity-price cells (E3).
+   - Against the strongest comparators (TimesFM-3, Chronos-2, TiRex-2), the gap is usually 1–4 % and often inside the confidence set.</li>
+<li><strong>Single-model claims that hold up statistically:</strong>
+   - <strong>E2 synthetic suite:</strong> best average rank (2.65 vs 3.06 for TimesFM-3). The Nemenyi critical difference is 0.36, so the rank gap is significant. ci-proto also has the highest skill vs Seasonal Naive (0.601 [0.584, 0.617]).
+   - <strong>fev-bench, our re-run:</strong> win rate 0.855 [0.823, 0.885] and skill 0.497. Both are above every other re-run model, including TimesFM-3 (ours: 0.734 / 0.458).
+   - <strong>E3 hourly prices:</strong> best CRPS in 6 of 9 market × horizon cells and in the 90 % CRPS model confidence set in all 9.</li>
+<li><strong>The cohort mode is ci-proto's best configuration on multi-series data.</strong> On the 23-market daily price panel, <code>ci-proto[cohort]</code> has the lowest MAE and CRPS of all 17 models at every horizon, and the lowest RMSE at 7 and 30 days. Plain univariate ci-proto ranks mid-pack among the TSFMs there. Joint mode lowers ci-proto's MSE by 0–9 % on the multivariate LTSF sets.</li>
+<li><strong>Long context: it helps up to ~16 k steps, then stops helping or hurts.</strong>
+   - On 1-min household power (E5), MASE is flat beyond 2 k (h = 60). For h = 1440 it is best at 16 k (0.718) and 3–8 % worse at 65–524 k (0.742–0.773).
+   - On Beijing PM2.5 (E6), a history of 20–80 % of the training period beats the full history by 25–28 % RMSE at leads of 24–48 h.
+   - The architecture <em>runs</em> at 2 M steps (E8: 3.2 s, 5.7 GB). The run does <em>not</em> show that accuracy keeps improving with context.</li>
+<li><strong>Prediction intervals are too narrow.</strong>
+   - Univariate ci-proto has the worst 80 %-interval calibration among the TSFMs on the leakage-free and prospective tests: COV80 0.62–0.74 on E2, 0.72–0.73 on E3 daily.
+   - The cohort mode is the best-calibrated model overall (mean |COV80 − 0.8| = 0.032).
+   - The paper should report this, and post-hoc conformal calibration is a natural add-on.</li>
+<li><strong>Prospective 2026 window (after every model's training cut-off):</strong>
+   - ci-proto ties for best point accuracy at h = 1 and h = 7: MAE within 0.05 % of the best model.
+   - Its CRPS is 0.5 % behind the best at h = 1 (TimesFM-3) and 1.2 % behind at h = 7 (Chronos-2).
+   - In the short post-release window (13 days, 2026-11-13 → 25) it is 5th–6th of the 7 TSFMs. This window is too short to support a conclusion.</li>
+<li><strong>Covariates:</strong>
+   - Known future covariates help ci-proto most among the covariate-capable models (bike sharing: −15 % / −18 % MASE, both Holm-significant). On bike sharing it degrades far less than Chronos-2 under noisy future covariates.
+   - <strong>Past-only covariates hurt ci-proto significantly on Beijing</strong> (+20 % / +36 % MASE). This is a limitation to report.</li>
+<li><strong>Cost:</strong>
+   - At 2 k context and batch 1, ci-proto runs at 0.059 s, the same order as Chronos-2 (0.049 s), 5× faster than TimesFM-3 and 4× slower than TiRex-2.
+   - Latency and memory grow linearly with context. TiRex-2 is nearly flat: 0.054 s and 0.36 GB at 2 M steps, against 3.16 s and 5.7 GB for ci-proto.</li>
+<li><strong>Contamination warning for comparators.</strong>
+   - The E2 contamination audit flags TimesFM-2.5 and TimesFM-3 on Beijing air quality. Their long-lead error is 37 % and 59 % of the median model's.
+   - Their implausibly low E4/E6/E7 Beijing errors (e.g. RMSE ≈ 19 at every lead 1–48 h for TimesFM-2.5) should be excluded from, or flagged in, any comparison.</li>
+</ol>
+<hr />
+<h2 id="2-e1-general-benchmarks">2. E1 — General benchmarks</h2>
+<h3>2a. LTSF zero-shot (ETT ×4, Electricity, Traffic, Weather, Exchange, Solar)</h3>
+<p>MSE on train-z-scored data, horizons 96/192/336/720, lookbacks 512/2048/full. There are 944 cells in total, all with status <code>ok</code> (<code>results/E1_general_benchmarks/full/ltsf_zero_shot.csv</code>).</p>
+<p><strong>Rank over 36 dataset × horizon cells, channel-independent mode, 7 TSFMs:</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Mean rank, L = 512</th>
+<th>Wins, L = 512</th>
+<th>Mean rank, L = 2048</th>
+<th>Wins, L = 2048</th>
+<th>Mean rank, best lookback</th>
+<th>Wins, best lookback</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ci-proto</strong></td>
+<td><strong>2.64</strong></td>
+<td>9</td>
+<td><strong>2.69</strong></td>
+<td>10</td>
+<td><strong>1.89</strong></td>
+<td><strong>19</strong></td>
+</tr>
+<tr>
+<td>TiRex-2</td>
+<td>3.28</td>
+<td>9</td>
+<td>2.94</td>
+<td><strong>12</strong></td>
+<td>3.50</td>
+<td>6</td>
+</tr>
+<tr>
+<td>Chronos-2</td>
+<td>4.72</td>
+<td>1</td>
+<td>3.28</td>
+<td>4</td>
+<td>3.67</td>
+<td>0</td>
+</tr>
+<tr>
+<td>TimesFM-2.5</td>
+<td>3.83</td>
+<td>2</td>
+<td>4.69</td>
+<td>4</td>
+<td>4.00</td>
+<td>5</td>
+</tr>
+<tr>
+<td>TimesFM-3</td>
+<td>4.72</td>
+<td>4</td>
+<td>4.39</td>
+<td>0</td>
+<td>4.08</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Moirai-2</td>
+<td>4.61</td>
+<td>3</td>
+<td>5.14</td>
+<td>3</td>
+<td>5.39</td>
+<td>4</td>
+</tr>
+<tr>
+<td>TiRex</td>
+<td>4.19</td>
+<td>8</td>
+<td>4.86</td>
+<td>3</td>
+<td>5.47</td>
+<td>1</td>
+</tr>
+</tbody>
+</table></div>
+<p>"Best lookback" picks each model's best lookback per cell on the test set, an oracle that favours models with more lookbacks. On the five large sets only ci-proto and Seasonal Naive have a <code>full</code> lookback (cost-driven, see PROTOCOL_CHANGES §9), so report it as a secondary view. The fixed-lookback columns are the fair comparison.</p>
+<p><strong>Mean MSE over horizons, best lookback:</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>ci-proto</th>
+<th>Best other (model)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ETTh1</td>
+<td>0.388</td>
+<td>0.384 (TiRex-2)</td>
+</tr>
+<tr>
+<td>ETTh2</td>
+<td><strong>0.327</strong></td>
+<td>0.328 (TiRex)</td>
+</tr>
+<tr>
+<td>ETTm1</td>
+<td><strong>0.330</strong></td>
+<td>0.360 (TimesFM-3)</td>
+</tr>
+<tr>
+<td>ETTm2</td>
+<td><strong>0.248</strong></td>
+<td>0.248 (TimesFM-3)</td>
+</tr>
+<tr>
+<td>Electricity</td>
+<td><strong>0.147</strong></td>
+<td>0.153 (Chronos-2)</td>
+</tr>
+<tr>
+<td>Traffic</td>
+<td>0.343</td>
+<td><strong>0.324</strong> (TimesFM-2.5)</td>
+</tr>
+<tr>
+<td>Weather</td>
+<td><strong>0.201</strong></td>
+<td>0.221 (TiRex-2)</td>
+</tr>
+<tr>
+<td>Exchange</td>
+<td>0.370</td>
+<td><strong>0.230</strong> (TiRex-2)</td>
+</tr>
+<tr>
+<td>Solar</td>
+<td>0.206</td>
+<td><strong>0.164</strong> (Moirai-2)</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Weaknesses:</strong>
+- <strong>Exchange:</strong> a random-walk-like series where TiRex-2 is far ahead and ci-proto does not beat Seasonal Naive at H = 720.
+- <strong>Solar:</strong> Chronos-2 and Moirai-2 are best there.
+- <strong>Traffic:</strong> TimesFM-2.5 is best there.</p>
+<p><strong>Joint (multivariate) mode</strong> changes ci-proto's MSE by a mean ratio of 0.91 (Weather), 0.95 (ETTh2, Exchange), 0.98 (ETTh1, ETTm2) and 1.00 (ETTm1). In single cells it is at most 4 % worse.</p>
+<p><strong>Full history vs 2048</strong> for ci-proto gives a mean MSE ratio of 0.90–0.97 on most sets. The exception is ETTh2 (1.05), where the longer history hurts.</p>
+<h3>2b. fev-bench (100 tasks), our re-run</h3>
+<p>Source: <code>results/tables/full/fev_leaderboard_SQL.csv</code>.
+- Failed tasks are imputed with Seasonal Naive, per fev's rule.
+- Win rate and skill are vs Seasonal Naive, with 95 % bootstrap CIs.
+- Rows without "(ours)" are the official leaderboard entries on the same tasks.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Win rate</th>
+<th>Skill (SQL)</th>
+<th>Failed tasks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ci-proto (official, self-reported)</td>
+<td>0.921 [0.900, 0.941]</td>
+<td>0.515 [0.471, 0.561]</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>ci-proto[cohort] (ours)</strong></td>
+<td><strong>0.860</strong> [0.823, 0.893]</td>
+<td>0.493</td>
+<td>5</td>
+</tr>
+<tr>
+<td><strong>ci-proto (ours)</strong></td>
+<td>0.855 [0.823, 0.885]</td>
+<td><strong>0.497</strong> [0.448, 0.546]</td>
+<td>2</td>
+</tr>
+<tr>
+<td>TimesFM-3 (official)</td>
+<td>0.823</td>
+<td>0.490</td>
+<td>0</td>
+</tr>
+<tr>
+<td>TimesFM-3 (ours)</td>
+<td>0.734</td>
+<td>0.458</td>
+<td>0</td>
+</tr>
+<tr>
+<td>TiRex-2 (ours)</td>
+<td>0.715</td>
+<td>0.455</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Chronos-2 (ours)</td>
+<td>0.701</td>
+<td>0.462</td>
+<td>2</td>
+</tr>
+<tr>
+<td>TimesFM-2.5 (ours)</td>
+<td>0.654</td>
+<td>0.467</td>
+<td>0</td>
+</tr>
+<tr>
+<td>TiRex (ours)</td>
+<td>0.638</td>
+<td>0.427</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Moirai-2 (ours)</td>
+<td>0.496</td>
+<td>0.399</td>
+<td>1</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Reproduction fidelity</strong> (<code>fev_reproduction_fidelity.csv</code>): our numbers divided by the self-reported ones.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Geometric-mean SQL ratio (ours / official)</th>
+<th>Share of tasks within 2 %</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TiRex, TiRex-2, TimesFM-2.5</td>
+<td>≈ 1.000</td>
+<td>≥ 0.99</td>
+<td>Matched exactly</td>
+</tr>
+<tr>
+<td>Moirai-2</td>
+<td>1.000</td>
+<td>0.83</td>
+<td></td>
+</tr>
+<tr>
+<td>Chronos-2</td>
+<td>1.008</td>
+<td>0.76</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>ci-proto</strong></td>
+<td><strong>1.022</strong></td>
+<td>0.65</td>
+<td>Median ratio 1.005, Spearman 0.995</td>
+</tr>
+<tr>
+<td>TimesFM-3</td>
+<td>1.063</td>
+<td>0.54</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>Our ci-proto re-run is about 2 % worse than the self-reported entry, which partly explains its lower win rate (0.855 vs 0.921). The paper should cite our numbers and mention the gap.</p>
+<p><strong>Failures:</strong> the CUDA-driver faults (PROTOCOL_CHANGES §11–13) left a few tasks unrecoverable. They count as Seasonal Naive:
+- ci-proto: <code>entsoe_15T</code>, <code>solar_with_weather_15T</code>
+- cohort mode: the same two plus <code>LOOP_SEATTLE_5T</code>, <code>LOOP_SEATTLE_1H</code>, <code>ercot_1H</code>
+- Chronos-2: <code>LOOP_SEATTLE_5T</code>, <code>LOOP_SEATTLE_1H</code>
+- Moirai-2: 1 task</p>
+<h2 id="3-e10-gift-eval-97-configurations">3. E10 — GIFT-Eval (97 configurations)</h2>
+<p>Source: <code>results/tables/full/gift_eval_leaderboard.csv</code>. CRPS and MASE are geometric means normalised by the official Seasonal Naive. "Avg rank" is the average CRPS rank.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>CRPS</th>
+<th>MASE</th>
+<th>Avg rank</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TimesFM-3 (official)</td>
+<td><strong>0.456</strong></td>
+<td><strong>0.667</strong></td>
+<td><strong>2.99</strong></td>
+</tr>
+<tr>
+<td><strong>ci-proto (ours)</strong></td>
+<td>0.462</td>
+<td>0.676</td>
+<td>4.03</td>
+</tr>
+<tr>
+<td>TiRex-2 (official)</td>
+<td>0.478</td>
+<td>0.697</td>
+<td>5.63</td>
+</tr>
+<tr>
+<td>Toto-2.0 (official)</td>
+<td>0.481</td>
+<td>0.703</td>
+<td>5.47</td>
+</tr>
+<tr>
+<td>Chronos-2 (official)</td>
+<td>0.485</td>
+<td>0.698</td>
+<td>5.52</td>
+</tr>
+<tr>
+<td>TiRex (official)</td>
+<td>0.488</td>
+<td>0.716</td>
+<td>6.09</td>
+</tr>
+<tr>
+<td>TimesFM-2.5 (official)</td>
+<td>0.490</td>
+<td>0.705</td>
+<td>6.60</td>
+</tr>
+<tr>
+<td>TiRex-2 (ours)</td>
+<td>0.501</td>
+<td>0.713</td>
+<td>7.13</td>
+</tr>
+<tr>
+<td>Moirai-2 (official)</td>
+<td>0.516</td>
+<td>0.728</td>
+<td>8.73</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>ci-proto is second, 1.3 % behind TimesFM-3 in CRPS and ahead of every other published model.</li>
+<li>There is no official ci-proto GIFT-Eval entry, so this is new evidence.</li>
+</ul>
+<p><strong>Caveats:</strong>
+- Our TiRex-2 re-run is 2.3 % worse than its official CRPS (median ratio 1.023). Treat about 2 % as the reproduction noise floor of our harness on GIFT-Eval.
+- Some leaderboard models were trained on GIFT-Eval's pre-training split or test data. Check the leaderboard's leakage flags before comparing against TimesFM-3.
+- Chronos-2 (ours) is incomplete: 23 configurations crash the WSL CUDA driver every time (electricity, solar, kdd_cup_2018, loop_seattle, m_dense, m4_daily). Its official entry is used instead.</p>
+<h2 id="4-e2-leakage-control">4. E2 — Leakage control</h2>
+<h3>4a. Synthetic suite</h3>
+<p>Source: <code>results/tables/full/e2_leaderboard_SQL.csv</code> and <code>e2_friedman.json</code>. The suite has 1416 series (8 processes plus 14 families × 10 series, 5 seeds) at h = 24/168. Skill is SQL vs Seasonal Naive.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Skill [95 % CI]</th>
+<th>Win rate</th>
+<th>Avg rank</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ci-proto</strong></td>
+<td><strong>0.601</strong> [0.584, 0.617]</td>
+<td><strong>0.817</strong></td>
+<td><strong>2.65</strong></td>
+</tr>
+<tr>
+<td>TimesFM-3</td>
+<td>0.590 [0.573, 0.605]</td>
+<td>0.771</td>
+<td>3.06</td>
+</tr>
+<tr>
+<td>Chronos-2</td>
+<td>0.584 [0.567, 0.600]</td>
+<td>0.739</td>
+<td>3.35</td>
+</tr>
+<tr>
+<td>TimesFM-2.5</td>
+<td>0.561</td>
+<td>0.634</td>
+<td>4.29</td>
+</tr>
+<tr>
+<td>TiRex-2</td>
+<td>0.545</td>
+<td>0.613</td>
+<td>4.48</td>
+</tr>
+<tr>
+<td>TiRex</td>
+<td>0.555</td>
+<td>0.553</td>
+<td>5.02</td>
+</tr>
+<tr>
+<td>Moirai-2</td>
+<td>0.537</td>
+<td>0.422</td>
+<td>6.20</td>
+</tr>
+<tr>
+<td>AutoTheta</td>
+<td>0.154</td>
+<td>0.180</td>
+<td>8.38</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>The Friedman test gives χ² = 8061 (p ≈ 0) with Nemenyi CD = 0.36. <strong>ci-proto's average rank is significantly better than every other model's.</strong></li>
+<li>Where it gains most:</li>
+<li>Chaotic systems: Lorenz skill 0.68 vs ≤ 0.51 for the others; Mackey–Glass 0.80 vs ≤ 0.70.</li>
+<li>Seasonality breaks: MASE 0.725 vs ≥ 0.78.</li>
+<li>Where it is worse: logistic-seasonal series (0.59 vs 0.70 for TimesFM-3/Chronos-2) and trend breaks (behind TimesFM-3/2.5).</li>
+</ul>
+<p><strong>Contamination audit</strong> (<code>contamination_audit.csv</code>): long-lead RMSE relative to the median model. The only flags are TimesFM-2.5 (0.37) and TimesFM-3 (0.59) on Beijing air quality, so those Beijing results are treated as likely training-set exposure.</p>
+<h3>4b. Prospective window (Ember daily prices, 23 markets)</h3>
+<p>Source: <code>prospective_summary.csv</code>. The hold-out covers 2026-01-01 → 2026-11-25 (7.6 k windows, after every comparator's training cut-off). The post-release window covers 2026-11-13 → 25 (299 h = 1 windows, 161 h = 7 windows).</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>MAE, hold-out h = 1</th>
+<th>MAE, hold-out h = 7</th>
+<th>CRPS, hold-out h = 1</th>
+<th>CRPS, hold-out h = 7</th>
+<th>COV80, hold-out h = 1</th>
+<th>MAE, post-release h = 1</th>
+<th>MAE, post-release h = 7</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ci-proto</td>
+<td>19.86</td>
+<td>26.25</td>
+<td>15.70</td>
+<td>20.80</td>
+<td>0.72</td>
+<td>33.81</td>
+<td>42.26</td>
+</tr>
+<tr>
+<td>TimesFM-3</td>
+<td><strong>19.85</strong></td>
+<td>26.30</td>
+<td><strong>15.63</strong></td>
+<td>20.66</td>
+<td>0.75</td>
+<td>32.89</td>
+<td><strong>40.13</strong></td>
+</tr>
+<tr>
+<td>Chronos-2</td>
+<td>19.92</td>
+<td><strong>26.24</strong></td>
+<td>15.65</td>
+<td><strong>20.55</strong></td>
+<td>0.75</td>
+<td>34.58</td>
+<td>41.02</td>
+</tr>
+<tr>
+<td>TiRex-2</td>
+<td>19.94</td>
+<td>26.45</td>
+<td>15.64</td>
+<td>20.71</td>
+<td>0.78</td>
+<td>33.31</td>
+<td>40.83</td>
+</tr>
+<tr>
+<td>TimesFM-2.5</td>
+<td>19.87</td>
+<td>26.48</td>
+<td>15.65</td>
+<td>20.82</td>
+<td>0.79</td>
+<td><strong>32.77</strong></td>
+<td>41.42</td>
+</tr>
+<tr>
+<td>TiRex</td>
+<td>20.13</td>
+<td>27.00</td>
+<td>15.79</td>
+<td>21.01</td>
+<td>0.78</td>
+<td>32.88</td>
+<td>40.85</td>
+</tr>
+<tr>
+<td>Moirai-2</td>
+<td>20.42</td>
+<td>27.04</td>
+<td>15.99</td>
+<td>21.08</td>
+<td>0.79</td>
+<td>34.48</td>
+<td>42.48</td>
+</tr>
+<tr>
+<td>AutoTheta</td>
+<td>21.61</td>
+<td>30.33</td>
+<td>17.36</td>
+<td>24.68</td>
+<td>0.77</td>
+<td>36.50</td>
+<td>44.81</td>
+</tr>
+<tr>
+<td>Seasonal Naive</td>
+<td>35.33</td>
+<td>35.19</td>
+<td>30.33</td>
+<td>30.21</td>
+<td>0.51</td>
+<td>77.62</td>
+<td>78.05</td>
+</tr>
+</tbody>
+</table></div>
+<p>Accuracy and CRPS differences among the top five models in the hold-out are under 0.5 %. ci-proto's intervals are the narrowest and its COV80 is the lowest.</p>
+<h2 id="5-e3-electricity-prices">5. E3 — Electricity prices</h2>
+<h3>5a. Daily, 23 Ember markets</h3>
+<p>Test period 2024–2025. Contexts are selected on 2023 validation data. Sources: <code>results/E3_electricity_prices/full/summary_daily.csv</code> and <code>analysis/daily_*</code>.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>MAE, h = 1</th>
+<th>MAE, h = 7</th>
+<th>MAE, h = 30</th>
+<th>CRPS, h = 1</th>
+<th>CRPS, h = 7</th>
+<th>CRPS, h = 30</th>
+<th>COV80, h = 1</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ci-proto[cohort]</strong></td>
+<td><strong>15.26</strong></td>
+<td><strong>19.26</strong></td>
+<td><strong>21.67</strong></td>
+<td><strong>12.05</strong></td>
+<td><strong>15.15</strong></td>
+<td><strong>17.01</strong></td>
+<td>0.75</td>
+</tr>
+<tr>
+<td>TimesFM-3</td>
+<td>15.30</td>
+<td>19.36</td>
+<td>22.02</td>
+<td>12.09</td>
+<td>15.23</td>
+<td>17.34</td>
+<td>0.77</td>
+</tr>
+<tr>
+<td>Chronos-2</td>
+<td>15.36</td>
+<td>19.38</td>
+<td>21.76</td>
+<td>12.14</td>
+<td>15.26</td>
+<td>17.11</td>
+<td>0.75</td>
+</tr>
+<tr>
+<td>TiRex-2</td>
+<td>15.41</td>
+<td>19.40</td>
+<td>22.08</td>
+<td>12.14</td>
+<td>15.27</td>
+<td>17.40</td>
+<td>0.79</td>
+</tr>
+<tr>
+<td>TimesFM-2.5</td>
+<td>15.41</td>
+<td>19.56</td>
+<td>21.87</td>
+<td>12.17</td>
+<td>15.41</td>
+<td>17.21</td>
+<td>0.81</td>
+</tr>
+<tr>
+<td>ci-proto</td>
+<td>15.47</td>
+<td>19.63</td>
+<td>22.16</td>
+<td>12.25</td>
+<td>15.53</td>
+<td>17.45</td>
+<td>0.72</td>
+</tr>
+<tr>
+<td>LEAR-recal</td>
+<td>17.46</td>
+<td>22.17</td>
+<td>24.22</td>
+<td>14.16</td>
+<td>17.91</td>
+<td>19.79</td>
+<td>0.85</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>Diebold–Mariano tests (HLN, Holm 5 %, per market) use univariate ci-proto as the reference.</li>
+<li>With absolute loss, it beats AutoETS, AutoTheta, GBM, LEAR, LEAR-recal and the naive baselines in 96–100 % of markets at h = 1 and 7.</li>
+<li>At h = 30 the shares are 78–100 %, except LEAR-recal and N-BEATS (both 43 %).</li>
+<li>It beats no TSFM significantly in more than 17 % of markets.</li>
+<li>The 90 % model confidence set (MCS) on absolute and pinball loss contains ci-proto[cohort], TimesFM-3, TimesFM-2.5, TiRex-2 and Chronos-2 at every horizon. Univariate ci-proto drops out at h = 1 (pinball) and h = 7 (absolute loss).</li>
+</ul>
+<h3>5b. Hourly, Germany / Great Britain / Spain</h3>
+<p>Horizons 4/24/40 h. Test MAE / CRPS / COV80 at each model's validation-selected context. Source: <code>analysis/{DE,GB,ES}_pooled.csv</code>.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Market, horizon</th>
+<th>Best model on CRPS</th>
+<th>Runner-up</th>
+<th>ci-proto rank on CRPS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DE, 4 h</td>
+<td><strong>ci-proto</strong> 5.18 / 4.13 / 0.84</td>
+<td>TiRex-2 5.45 / 4.41</td>
+<td>1</td>
+</tr>
+<tr>
+<td>DE, 24 h</td>
+<td><strong>ci-proto</strong> 17.52 / 14.01 / 0.76</td>
+<td>TimesFM-3 17.51 / 14.02</td>
+<td>1</td>
+</tr>
+<tr>
+<td>DE, 40 h</td>
+<td>TimesFM-3 19.55 / 15.62</td>
+<td>ci-proto 19.71 / 15.67</td>
+<td>2</td>
+</tr>
+<tr>
+<td>GB, 4 h</td>
+<td><strong>ci-proto</strong> 5.39 / 4.27 / 0.79</td>
+<td>Chronos-2 5.63 / 4.47</td>
+<td>1</td>
+</tr>
+<tr>
+<td>GB, 24 h</td>
+<td>TiRex-2 11.64 / 9.36</td>
+<td>Chronos-2 11.97 / 9.46</td>
+<td>4</td>
+</tr>
+<tr>
+<td>GB, 40 h</td>
+<td><strong>ci-proto</strong> 13.54 / 10.80 / 0.78</td>
+<td>TiRex-2 13.59 / 10.91</td>
+<td>1</td>
+</tr>
+<tr>
+<td>ES, 4 h</td>
+<td><strong>ci-proto</strong> 5.08 / 4.02 / 0.86</td>
+<td>TiRex-2 5.23 / 4.16</td>
+<td>1</td>
+</tr>
+<tr>
+<td>ES, 24 h</td>
+<td>Chronos-2 11.34 / 8.95</td>
+<td>TimesFM-3 11.94 / 9.47</td>
+<td>6</td>
+</tr>
+<tr>
+<td>ES, 40 h</td>
+<td><strong>ci-proto</strong> 13.73 / 10.78 / 0.83</td>
+<td>Chronos-2 14.35 / 11.30</td>
+<td>1</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>ci-proto's gain is largest at the 4-hour horizon: 3–6 % lower CRPS than the runner-up in all three markets.</li>
+<li>Its weak spot is the day-ahead (24 h) horizon in Great Britain and Spain.</li>
+<li>LEAR and LEAR-recalibrated are 30–45 % worse than the best TSFM in every hourly market.</li>
+<li>ci-proto is in the 90 % CRPS MCS for all 9 cells (§10).</li>
+</ul>
+<h2 id="6-e4-covariates-and-calendar-features">6. E4 — Covariates and calendar features</h2>
+<p>Beijing air quality (12 stations) and UCI bike sharing, h = 24/168, 52 weekly origins.</p>
+<p>Conditions:
+- C0: no covariates.
+- C1: calendar features.
+- C2: plus known holiday/working-day flags.
+- C3: plus past-only weather.
+- C4: C2 plus actual future temperature, with past humidity and wind.
+- C5: C4 with Gaussian noise of σ × 0.5 / 1 / 5 on the future covariates.</p>
+<p>The table shows the median % change in MASE vs C0 (<code>tests_vs_C0.csv</code>). <code>*</code> marks Holm-adjusted Wilcoxon p &lt; 0.05.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Dataset, horizon</th>
+<th>Model</th>
+<th>C1</th>
+<th>C2</th>
+<th>C3</th>
+<th>C4</th>
+<th>C5, σ × 1</th>
+<th>C5, σ × 5</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bike sharing, 24</td>
+<td>ci-proto</td>
+<td>−1.0</td>
+<td>+1.6</td>
+<td>−6.3</td>
+<td><strong>−15.1*</strong></td>
+<td>+7.6</td>
+<td>+9.7</td>
+</tr>
+<tr>
+<td></td>
+<td>Chronos-2</td>
+<td>0</td>
+<td>+8.2</td>
+<td>+5.9</td>
+<td>+2.1</td>
+<td>+51.9*</td>
+<td>+121.4*</td>
+</tr>
+<tr>
+<td></td>
+<td>TiRex-2</td>
+<td>0</td>
+<td>−1.1</td>
+<td>−0.3</td>
+<td>−1.2*</td>
+<td>−2.7*</td>
+<td>−1.5</td>
+</tr>
+<tr>
+<td>Bike sharing, 168</td>
+<td>ci-proto</td>
+<td>−0.4</td>
+<td>−1.7*</td>
+<td>−3.4*</td>
+<td><strong>−18.0*</strong></td>
+<td>+2.8</td>
+<td>+6.1*</td>
+</tr>
+<tr>
+<td></td>
+<td>Chronos-2</td>
+<td>0</td>
+<td>+1.2</td>
+<td>+1.5</td>
+<td>−7.9*</td>
+<td>+4.2</td>
+<td>+25.4*</td>
+</tr>
+<tr>
+<td>Beijing, 24</td>
+<td>ci-proto</td>
+<td>+1.7*</td>
+<td>—</td>
+<td><strong>+20.1*</strong></td>
+<td>+9.3*</td>
+<td>+39.4*</td>
+<td>+68.9*</td>
+</tr>
+<tr>
+<td></td>
+<td>Chronos-2</td>
+<td>0</td>
+<td>—</td>
+<td>−0.7*</td>
+<td><strong>−21.0*</strong></td>
+<td>+49.2*</td>
+<td>+79.7*</td>
+</tr>
+<tr>
+<td></td>
+<td>TiRex-2</td>
+<td>0</td>
+<td>—</td>
+<td>−0.1</td>
+<td>−7.4*</td>
+<td>+131.1*</td>
+<td>+162.5*</td>
+</tr>
+<tr>
+<td>Beijing, 168</td>
+<td>ci-proto</td>
+<td>+3.9*</td>
+<td>—</td>
+<td><strong>+36.3*</strong></td>
+<td>+1.9</td>
+<td>+41.9*</td>
+<td>+54.5*</td>
+</tr>
+<tr>
+<td></td>
+<td>Chronos-2</td>
+<td>0</td>
+<td>—</td>
+<td>+0.3*</td>
+<td>−35.2*</td>
+<td>+4.6*</td>
+<td>+26.7*</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>On bike sharing, ci-proto uses known future covariates best: −15 % and −18 %. With C4 it has the lowest MASE of all models (0.620 / 0.636, vs TimesFM-3 at C0: 0.725 / 0.731). Under noisy covariates it degrades far less than Chronos-2 (+10 % vs +121 % at σ × 5). TiRex-2 barely changes because it largely ignores covariates.</li>
+<li>On Beijing, ci-proto is significantly <em>hurt</em> by adding past-only weather covariates (C3) and by calendar features (C1). Chronos-2 gains most from future temperature (C4).</li>
+<li>Here only Chronos-2, TiRex-2 and ci-proto take covariates; the other models run C0/C1 only.</li>
+<li>The TimesFM-2.5 and TimesFM-3 Beijing numbers (MASE 0.20–0.34) are contamination-flagged (§4a) and should not be used as a reference.</li>
+</ul>
+<h2 id="7-e5-context-scaling-uci-household-power">7. E5 — Context scaling (UCI household power, 1-min, about 2.07 M points)</h2>
+<p>Source: <code>results/E5_context_scaling/full/context_scaling.csv</code>. 20 daily origins. The table shows MASE.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Context</th>
+<th>ci-proto, h = 60</th>
+<th>Best other, h = 60</th>
+<th>ci-proto, h = 1440</th>
+<th>TimesFM-3, h = 1440</th>
+<th>TiRex-2, h = 1440</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>512</td>
+<td>0.160</td>
+<td>0.157 (Moirai-2)</td>
+<td>0.889</td>
+<td>1.004</td>
+<td>0.977</td>
+</tr>
+<tr>
+<td>2 048</td>
+<td>0.151</td>
+<td>0.150 (Moirai-2, TimesFM-2.5)</td>
+<td>0.772</td>
+<td>0.760</td>
+<td>0.830</td>
+</tr>
+<tr>
+<td>8 192</td>
+<td>0.155</td>
+<td>0.149 (TimesFM-3)</td>
+<td>0.724</td>
+<td><strong>0.692</strong></td>
+<td>0.830</td>
+</tr>
+<tr>
+<td>16 384</td>
+<td>0.153</td>
+<td>0.148</td>
+<td><strong>0.718</strong></td>
+<td>0.699</td>
+<td>0.830</td>
+</tr>
+<tr>
+<td>65 536</td>
+<td>0.151</td>
+<td>0.148</td>
+<td>0.743</td>
+<td>(truncated)</td>
+<td>0.830</td>
+</tr>
+<tr>
+<td>131 072</td>
+<td>0.152</td>
+<td>0.148</td>
+<td>0.760</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>262 144</td>
+<td>0.152</td>
+<td>0.148</td>
+<td>0.773</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>524 288</td>
+<td>0.152</td>
+<td>0.148</td>
+<td>0.742</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>≥ 1 048 576</td>
+<td>OOM (8 GB)</td>
+<td>0.148</td>
+<td>OOM (8 GB)</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>At h = 60, every competent model saturates by about 2 k steps.</li>
+<li>At h = 1440, ci-proto improves up to 16 k and is then 3–8 % worse up to 524 k (non-monotone: 0.773 at 262 k, 0.742 at 524 k). TimesFM-3 (native 16 k) is best overall.</li>
+<li>The other models plateau because they truncate to their native window, so "full context" adds nothing for them.</li>
+<li>ci-proto at 262 k and 524 k context was recomputed in the gap reruns (PROTOCOL_CHANGES §14). At ≥ 1 M steps with calendar features, ci-proto runs out of memory on the 8 GB card (E8 shows the model itself runs at 2 M steps without calendar features), so these cells are reported as hardware-limited.</li>
+<li>TimesFM-2.5 fails at h = 1440: the horizon exceeds its maximum output length.</li>
+</ul>
+<p><strong>After structural breaks</strong> (<code>regime_breaks.csv</code>, MASE at 256 → 65 k context):
+- ci-proto handles seasonality breaks best: 0.75–0.77 at every context, against 0.87–1.58 for the others.
+- On trend breaks it collapses at the longest context: 0.97 → 1.44 at 65 k. Context inertia is real here.</p>
+<h2 id="8-e6-data-scarcity-beijing-multi-site-pm">8. E6 — Data scarcity (Beijing multi-site PM2.5)</h2>
+<p>Source: <code>results/E6_data_scarcity/full/summary.csv</code>. RMSE in µg/m³ by lead.
+- Zero-shot TSFMs are compared with LSTM, PatchTST, N-BEATS and quantile GBM, each trained on 20–100 % of two years of history.
+- ci-proto runs with the 120-step window, a history matched to the training ratio, and the full history.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Lead (h)</th>
+<th>ci-proto, matched 0.2 / 0.8 / full</th>
+<th>TiRex-2, full</th>
+<th>Chronos-2, full</th>
+<th>Moirai-2, full</th>
+<th>Best supervised (100 %)</th>
+<th>Seasonal Naive</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>18.1 / 18.0 / 19.2</td>
+<td>18.5</td>
+<td>19.7</td>
+<td>18.7</td>
+<td>19.0 (N-BEATS)</td>
+<td>91.5</td>
+</tr>
+<tr>
+<td>6</td>
+<td>38.0 / 37.5 / 43.0</td>
+<td>42.5</td>
+<td>49.7</td>
+<td>49.6</td>
+<td>50.1 (GBM)</td>
+<td>91.2</td>
+</tr>
+<tr>
+<td>24</td>
+<td>43.1 / 40.9 / 55.0</td>
+<td>51.4</td>
+<td>77.5</td>
+<td>81.3</td>
+<td>81.4 (PatchTST)</td>
+<td>89.5</td>
+</tr>
+<tr>
+<td>48</td>
+<td>45.9 / 43.2 / 59.7</td>
+<td>55.8</td>
+<td>86.3</td>
+<td>88.3</td>
+<td>90.9 (GBM)</td>
+<td>107.3</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>From lead 6 onward, the best zero-shot TSFMs beat every supervised model at every training ratio. At lead 24, the best supervised model (PatchTST, 100 % of the data) has 1.5× ci-proto's full-history error and 2× its matched-history error.</li>
+<li>With a moderate history (matched 0.4–0.8), ci-proto is the best non-flagged model at every lead ≥ 3.</li>
+<li>Giving ci-proto the full history raises its RMSE by 15–38 %, which agrees with E5.</li>
+<li>TimesFM-2.5 and TimesFM-3 are excluded from this ranking. Their errors (TimesFM-2.5: RMSE ≈ 19 at every lead 1–48 h) are inconsistent with forecasting from the past alone, and the audit flags both on this dataset.</li>
+</ul>
+<h2 id="9-e7-ablations-and-missing-data">9. E7 — Ablations and missing data</h2>
+<p>Source: <code>results/E7_ablations_robustness/full/summary.csv</code>, <code>tests_vs_default.csv</code>. The table shows SQL.</p>
+<p><strong>Test-time processing (TTA) flags:</strong>
+- <code>postprocess=False</code> is the only flag that matters everywhere: Beijing 0.407 → 0.496, bike 0.460 → 0.484, synthetic 0.625 → 0.641, Ember 0.898 → 0.903.
+- <code>tta_sign_flip=False</code> matters as much on Beijing and bike.
+- <code>tta_diff=False</code> gives a small loss on synthetic data (0.625 → 0.632).
+- Disabling calendar covariates <em>helps</em> slightly on bike (0.460 → 0.436), synthetic (0.625 → 0.597) and Ember (0.898 → 0.891). This repeats the E4 C1 finding.
+- <code>integer_round</code>, <code>clip_nonnegative</code>, <code>target_encode_categoricals</code> and <code>tta_running_totals</code> are neutral (|Δ| &lt; 0.1 %). Turning <code>bfloat16</code> off (fp32) is neutral on bike and Ember and slightly better on the synthetic suite (0.625 → 0.615).</p>
+<p><strong>Inference mode:</strong>
+- Cohort and joint modes improve Ember daily prices: 0.898 → 0.859 (−4.3 %).
+- They make no difference on ETTh1, bike or synthetic data.</p>
+<p><strong>Missing values</strong> (SQL at 0 → 50 % missing):</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Pattern</th>
+<th>ci-proto</th>
+<th>Chronos-2</th>
+<th>TiRex-2</th>
+<th>TimesFM-3</th>
+<th>Moirai-2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bike sharing</td>
+<td>Block</td>
+<td>0.460 → <strong>0.471</strong></td>
+<td>0.583 → 0.619</td>
+<td>0.517 → 0.629</td>
+<td>0.387 → 0.637</td>
+<td>0.432 → 0.628</td>
+</tr>
+<tr>
+<td>Bike sharing</td>
+<td>Random</td>
+<td>0.460 → <strong>0.521</strong></td>
+<td>0.583 → 0.587</td>
+<td>0.517 → 0.597</td>
+<td>0.387 → 0.588</td>
+<td>0.432 → 0.825</td>
+</tr>
+<tr>
+<td>Ember daily</td>
+<td>Random</td>
+<td>0.898 → 0.913</td>
+<td>0.866 → 0.912</td>
+<td>0.873 → 0.912</td>
+<td>0.875 → 0.944</td>
+<td>0.878 → 1.044</td>
+</tr>
+<tr>
+<td>Synthetic</td>
+<td>Random</td>
+<td>0.625 → 0.763</td>
+<td>0.702 → 1.597</td>
+<td>0.656 → 0.697</td>
+<td>0.615 → 0.733</td>
+<td>0.662 → 1.434</td>
+</tr>
+<tr>
+<td>ETTh1</td>
+<td>Block</td>
+<td>0.572 → 0.592</td>
+<td>0.566 → 0.587</td>
+<td>0.568 → 0.599</td>
+<td>0.578 → 0.764</td>
+<td>0.578 → 0.652</td>
+</tr>
+<tr>
+<td>ETTh1</td>
+<td>Random</td>
+<td>0.572 → 0.639</td>
+<td>0.566 → 0.606</td>
+<td>0.568 → 0.599</td>
+<td>0.578 → 0.676</td>
+<td>0.578 → 0.793</td>
+</tr>
+<tr>
+<td>Beijing</td>
+<td>Block</td>
+<td>0.407 → 0.425</td>
+<td>0.302 → 0.319</td>
+<td>0.307 → 0.367</td>
+<td>0.218 → 0.314*</td>
+<td>0.419 → 0.485</td>
+</tr>
+<tr>
+<td>Beijing</td>
+<td>Random</td>
+<td>0.407 → 0.428</td>
+<td>0.302 → 0.257</td>
+<td>0.307 → 0.339</td>
+<td>0.218 → 0.226*</td>
+<td>0.419 → 0.570</td>
+</tr>
+</tbody>
+</table></div>
+<p>* TimesFM-3 is contamination-flagged on Beijing (§4a).</p>
+<ul>
+<li>ci-proto is the most robust model to block-missing data on bike sharing.</li>
+<li>On Beijing it degrades least among the non-flagged models under block missingness (+4 %, against +6 % for Chronos-2 and +16–20 % for TiRex-2 and Moirai-2). Under random missingness it degrades +5 %, while Chronos-2 even improves. Its absolute SQL on Beijing (0.407) is, however, worse than that of Chronos-2 and TiRex-2.</li>
+<li>On ETTh1 it is mid-pack: +3.5 % (block) and +12 % (random at 50 %), against +4–7 % for Chronos-2 and +5 % for TiRex-2.</li>
+<li>TiRex-2 and TimesFM-3 are most robust to random missingness on the synthetic suite. Moirai-2 and Chronos-2 degrade most there.</li>
+</ul>
+<h2 id="10-probabilistic-forecast-tests">10. Probabilistic forecast tests</h2>
+<p>Sources: <code>results/tables/full/prob_*</code>, <code>analysis/probabilistic.py</code>. There are 15 evaluation sources (E2 prospective, E3 daily and hourly, E9). The tests are:
+- Diebold–Mariano tests on CRPS per series with Holm correction, plus a pairwise matrix.
+- MCS (90 %) on CRPS.
+- Kupiec and Christoffersen tests of 80 %-interval coverage.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Sources where the model is in the 90 % CRPS MCS (of 15)</th>
+<th>Mean |COV80 − 0.8|</th>
+<th>Share of sources where Kupiec rejects</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ci-proto</strong></td>
+<td><strong>14</strong></td>
+<td>0.083</td>
+<td>0.64</td>
+</tr>
+<tr>
+<td><strong>Chronos-2</strong></td>
+<td><strong>14</strong></td>
+<td>0.055</td>
+<td>0.59</td>
+</tr>
+<tr>
+<td>TimesFM-3</td>
+<td>13</td>
+<td>0.060</td>
+<td>0.59</td>
+</tr>
+<tr>
+<td>TiRex-2</td>
+<td>13</td>
+<td>0.063</td>
+<td>0.56</td>
+</tr>
+<tr>
+<td>TiRex</td>
+<td>11</td>
+<td>0.054</td>
+<td>0.53</td>
+</tr>
+<tr>
+<td>Moirai-2</td>
+<td>9</td>
+<td>0.037</td>
+<td>0.38</td>
+</tr>
+<tr>
+<td>TimesFM-2.5</td>
+<td>6</td>
+<td>0.096</td>
+<td>0.60</td>
+</tr>
+<tr>
+<td>ci-proto[cohort] (E3 daily only)</td>
+<td>3 of 3</td>
+<td><strong>0.032</strong></td>
+<td>0.46</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>Distribution accuracy (CRPS) is ci-proto's strength. It and Chronos-2 are the only models in the confidence set for 24 h and 40 h Spain.</li>
+<li>Calibration is its weakness:</li>
+<li>Univariate intervals are too narrow on the daily price data. COV80 is 0.62–0.72 in the E2 prospective windows and 0.72–0.73 in E3 daily.</li>
+<li>In the hourly markets COV80 is 0.83–0.93, too wide.</li>
+<li>That is, the univariate model's interval width does not adapt to the data's scale.</li>
+<li>These calibration tables evaluate one forecast set per source, the selected or full context (<code>probabilistic.py</code>). The E3 hourly coverages therefore differ from the context-selected values in §5b.</li>
+</ul>
+<h2 id="11-e8-inference-cost-rtx-4070-laptop-8-g">11. E8 — Inference cost (RTX 4070 Laptop, 8 GB)</h2>
+<p>Source: <code>results/E8_efficiency/full/efficiency.csv</code>. Default inference path for each model, batch 1, horizon 64. Latency is the median of 10 calls after 3 warm-ups.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Context</th>
+<th>ci-proto (fused Mamba-3)</th>
+<th>TiRex-2</th>
+<th>Chronos-2</th>
+<th>TimesFM-3</th>
+<th>TimesFM-2.5</th>
+<th>TiRex</th>
+<th>Moirai-2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2 048</td>
+<td>0.059 s / 0.79 GB</td>
+<td><strong>0.015 s</strong> / 0.35 GB</td>
+<td>0.049 s / 0.47 GB</td>
+<td>0.328 s / 1.27 GB</td>
+<td>0.274 s / 0.91 GB</td>
+<td>1.42 s / 0.14 GB</td>
+<td>0.018 s @ 1680</td>
+</tr>
+<tr>
+<td>16 384</td>
+<td>0.056 s / 0.82 GB</td>
+<td>0.012 s / 0.35 GB</td>
+<td>(native 8 k)</td>
+<td>1.044 s / 1.32 GB</td>
+<td>(native 15 k)</td>
+<td>(native 2 k)</td>
+<td>(native 1.7 k)</td>
+</tr>
+<tr>
+<td>262 144</td>
+<td>0.397 s / 1.96 GB</td>
+<td>0.015 s / 0.35 GB</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>2 097 152</td>
+<td>3.16 s / 5.72 GB</td>
+<td>0.054 s / 0.36 GB</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>Size:</strong> ci-proto has 167 M parameters, against 82.5 M (TiRex-2), 119 M (Chronos-2), 331 M (TimesFM-3) and 231 M (TimesFM-2.5).</li>
+<li><strong>FLOPs</strong> per series grow linearly for ci-proto: 27.6 GFLOP at 2 k, 99 at 8 k, 195 at 16 k. TiRex-2 is constant at 5.8. Chronos-2 needs 130 at 8 k and TimesFM-3 144 at 8 k.</li>
+<li><strong>Batch 32 at 2 k:</strong> 0.164 s for ci-proto, 0.100 s for TiRex-2, 0.22 s for Chronos-2 and 1.56 s for TimesFM-3.</li>
+<li><strong>Fused Mamba-3 kernels:</strong> they make ci-proto 6× (512) to 290× (262 k) faster than its PyTorch-eager path at batch 1. For example, at 262 k it takes 0.41 s fused against 119 s eager in bf16.</li>
+<li><strong>CPU:</strong> at 2 k and batch 1, ci-proto takes 3.8 s, against 0.27 s for TiRex-2 and 0.21 s for Chronos-2. CPU deployment is a weakness.</li>
+<li><strong>Cells not measured:</strong> PyTorch-eager cells whose first call took over 300 s were not repeated (PROTOCOL_CHANGES §12). The eager ci-proto variants at ≥ 1 M context and Chronos-2 at 8 k × 256 hit the CUDA-driver fault.</li>
+</ul>
+<h2 id="12-e9-volatility-negative-control">12. E9 — Volatility (negative control)</h2>
+<p>Data: daily |returns| of 17 FRED series (equity indices, FX, oil, gas), one-step-ahead, for 2023, 2024 and 2025. Source: <code>results/E9_volatility/full/</code>.
+- <strong>No model dominates.</strong> All TSFMs are within ±2 % of HAR-RV on RMSE.
+- <strong>ci-proto</strong> has the second-lowest QLIKE in 2025 (0.526, after TiRex-2 at 0.518) and is in the 90 % MCS for 5 of 6 year × loss cells.
+- <strong>Significance vs HAR-RV:</strong> ci-proto beats it with Holm significance in 6 % (squared loss) and 16 % (QLIKE) of series-years. Other TSFMs manage 6–12 % and 16–22 %.
+- <strong>Moirai-2</strong> has one extreme QLIKE failure in 2024 (3102).</p>
+<p>This is the expected negative-control result. TSFMs, ci-proto included, add little over HAR-RV for daily volatility, which matches Zhong, Fu &amp; Zhu (2026).</p>
+<hr />
+<h2 id="13-validity-limitations-and-open-items">13. Validity, limitations and open items</h2>
+<ul>
+<li><strong>Hardware faults:</strong> the WSL CUDA driver failed deterministically on some large inputs ("device not ready / Failed to create GPU mapping").</li>
+<li>The affected tasks are listed in <code>_cuda_fatal_*.txt</code> and handled as described in PROTOCOL_CHANGES §11–13. They count as Seasonal Naive in fev-bench, and as missing configurations for Chronos-2 in GIFT-Eval.</li>
+<li>The same fault silently produced error rows in E7 (ci-proto on ETTh1/Beijing in the missing-data study, <code>indep</code> mode, six TTA flags) and E5 (ci-proto at contexts ≥ 262 k).</li>
+<li>These were rerun on 2026-11-26/27 (<code>scripts/rerun_gaps.sh</code>, <code>rerun_e5_long.sh</code>, <code>rerun_e7_missing.sh</code>; old checkpoints in <code>results/_ckpt_backup_2026112{6,7}/</code>). All are now complete except ci-proto at ≥ 1 M context in E5 (out of memory on 8 GB), see the update note at the top of this file.</li>
+<li><strong>Reproduction gap:</strong> our harness reproduces most official fev-bench numbers to within 0.1 %. ci-proto is 2 % worse than its self-reported entry and TimesFM-3 is 6 % worse. On GIFT-Eval, TiRex-2 is 2.3 % worse than official.</li>
+<li>Differences of ≤ 2 % between models should not be claimed as wins without the paired tests reported here.</li>
+<li><strong>Contamination:</strong></li>
+<li>TimesFM-2.5 and TimesFM-3 on Beijing air quality are flagged; exclude them from E4, E6 and E7 Beijing comparisons.</li>
+<li>The E2 synthetic suite and the 2026 prospective window are the leakage-free evidence. ci-proto is best on the former and tied for best on the latter.</li>
+<li><strong>Cost-driven settings:</strong></li>
+<li>The large LTSF sets use stride 96, and only ci-proto has a full-history lookback there (PROTOCOL_CHANGES §9).</li>
+<li>E8 uses one laptop GPU; absolute latencies are hardware-specific, and the ratios are the result to report.</li>
+<li><strong>Small post-release window:</strong> 13 days and 299 one-day-ahead forecasts. Use it only as a sanity check.</li>
+<li><strong>Calibration:</strong> ci-proto's 80 % intervals fail the Kupiec test in 64 % of sources. A conformal or quantile-recalibration layer is a likely reviewer request.</li>
+</ul>
+<h2 id="14-suggested-claims-for-the-paper">14. Suggested claims for the paper</h2>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Claim</th>
+<th>Supported?</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>State-of-the-art zero-shot accuracy on leakage-free data</td>
+<td><strong>Yes</strong> (significant)</td>
+<td>E2 Friedman–Nemenyi; skill 0.601</td>
+</tr>
+<tr>
+<td>Top accuracy on standard benchmarks</td>
+<td><strong>Yes, near the top</strong></td>
+<td>fev-bench: our re-runs rank 1st and 2nd. GIFT-Eval: 2nd, 1.3 % behind TimesFM-3. LTSF: best mean rank</td>
+</tr>
+<tr>
+<td>Best for electricity-price forecasting</td>
+<td><strong>Yes for intraday horizons and the cohort mode</strong></td>
+<td>E3 hourly: 6 of 9 cells, always in the MCS. E3 daily: cohort mode best</td>
+</tr>
+<tr>
+<td>Exploits ultra-long (≥ 100 k) context</td>
+<td><strong>No</strong></td>
+<td>E5 and E6: gains stop at ~16 k and very long histories hurt</td>
+</tr>
+<tr>
+<td>Runs at million-step contexts</td>
+<td><strong>Yes</strong></td>
+<td>E8: 2 M points in 3.2 s, 5.7 GB</td>
+</tr>
+<tr>
+<td>Uses known covariates well</td>
+<td><strong>Yes (future covariates)</strong>, <strong>no (past-only)</strong></td>
+<td>E4</td>
+</tr>
+<tr>
+<td>Well-calibrated intervals</td>
+<td><strong>No</strong> (univariate); <strong>yes</strong> (cohort)</td>
+<td>§10</td>
+</tr>
+<tr>
+<td>Efficient</td>
+<td><strong>Partly</strong></td>
+<td>GPU latency like Chronos-2; linear in context; slow on CPU; TiRex-2 is cheaper</td>
+</tr>
+</tbody>
+</table></div>
+</div>

@@ -1,0 +1,339 @@
+# Experimental design for "ci-proto for time-series modelling".
+# Each experiment lists the published protocol it replicates (see docs/literature_protocols.md).
+# Run with:  python -m experiments.<script> --config configs/experiments.yaml [--quick]
+
+global:
+  seed: 2026
+  quantile_levels: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+  ci_proto:
+    source: ContinuousIntelligence/ci-proto
+    revision: ee3031351a151e3f6febf8c62b53e6ea1008bef6   # Hub commit used for the paper (2026-11-15)
+    device: auto
+  results_dir: results
+  hardware_note: "Report GPU model, driver, CUDA, torch version and model.backend (mamba3|torch)"
+
+# Shared model zoo; experiments select entries by key.
+models:
+  ci-proto:        {kind: ci-proto, mode: joint, name: "ci-proto"}   # univariate when rows are run separately
+  ci-proto-joint:  {kind: ci-proto, mode: joint, name: "ci-proto[joint]"}
+  ci-proto-cohort: {kind: ci-proto, mode: cohort, name: "ci-proto[cohort]"}
+  ci-proto-indep:  {kind: ci-proto, mode: independent, name: "ci-proto[indep]"}
+  chronos-2:       {kind: chronos-2}
+  tirex-2:         {kind: tirex-2}
+  tirex:           {kind: tirex}
+  timesfm-2.5:     {kind: timesfm-2.5}
+  timesfm-3:       {kind: timesfm-3}
+  moirai-2:        {kind: moirai-2, size: small}   # runs in envs/moirai (uni2ts pins torch 2.4)
+  seasonal-naive:  {kind: seasonal-naive, season: null}   # filled from the dataset
+  naive:           {kind: naive}
+  historical-mean: {kind: historical-mean}
+  autoets:         {kind: statsforecast, model: AutoETS, season: null}
+  autotheta:       {kind: statsforecast, model: AutoTheta, season: null}
+  mstl:            {kind: statsforecast, model: MSTL, season: null}
+  autoarima:       {kind: statsforecast, model: AutoARIMA, season: null}
+
+# Model groups used by the experiment sections below (YAML anchors keep the lists consistent).
+groups:
+  tsfm: &tsfm [ci-proto, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2]
+  tsfm_cov: &tsfm_cov [ci-proto, chronos-2, tirex-2]          # accept past/future covariates
+
+experiments:
+
+  E1_general_benchmarks:
+    question: "Does ci-proto's zero-shot accuracy reproduce on the standard TSFM benchmarks?"
+    replicates: ["fev-bench (Shchur et al., 2025)", "GIFT-Eval (Aksu et al., 2024)",
+                 "TiRex-2 (Podest et al., NeurIPS 2026)", "TimeRAF zero-shot protocol (IEEE TKDE 37(9), 2025)"]
+    suites:
+      fev_bench:
+        tasks: all            # 100 tasks, 46 with covariates, 35 multivariate
+        metrics: [SQL, MASE, WQL, WAPE]
+        aggregation: {skill_score_baseline: seasonal-naive, clip: [0.01, 100], win_rate: true,
+                      bootstrap_reps: 1000, ci_level: 0.95}
+        failures: replace_with_seasonal_naive
+        # Re-run independently with our harness; baselines and the rest of the leaderboard come from the
+        # official result files (data/fev_results, autogluon/fev benchmarks/fev_bench/results).
+        models: [ci-proto, ci-proto-cohort, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2]
+        official_results: data/fev_results
+      gift_eval:
+        configs: all          # 97 dataset/frequency/term configurations
+        metrics: [MASE, CRPS]
+        aggregation: {normalise_by: seasonal-naive, geometric_mean: true, average_rank_by: CRPS}
+        breakdowns: [domain, term, frequency, n_variates]
+        models: [ci-proto, chronos-2, tirex-2, timesfm-2.5, moirai-2, tirex, seasonal-naive]
+      ltsf_zero_shot:         # the protocol used by the Mamba forecasting papers in Q1 journals
+        datasets: [ETTh1, ETTh2, ETTm1, ETTm2, Electricity, Weather, Traffic, Exchange, Solar]
+        split: {ETT: [12, 4, 4], other: [0.7, 0.1, 0.2]}   # months for ETT; ratios otherwise
+        lookback: [512, 2048, full]
+        stride: 24           # every 24th test window (stride 1 = 4-11k windows per horizon; noted in the paper)
+        large:               # Electricity/Weather/Traffic/Exchange/Solar (E1 part ltsf_large), sized for an 8 GB GPU:
+          stride: 96         # 33-425 windows per horizon; stride 24 with full context = ~3 GPU-weeks (probe 2026-11-18)
+          full_lookback_models: [ci-proto, seasonal-naive]  # others truncate to their native context anyway
+        models: [ci-proto, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2, seasonal-naive]
+        horizons: [96, 192, 336, 720]
+        normalisation: train-split z-score (metrics on normalised scale)
+        metrics: [MSE, MAE]
+        mode: channel-independent and joint (report both)
+        compare_with_published: [S-Mamba (Neurocomputing 619, 2025), iTransformer, PatchTST, DLinear,
+                                 RLMamba (ESWA 278, 2025), DPEM (Inf. Fusion 2025), WaveletMamba (Neural Netw. 2026)]
+        leakage_flag: "ETT/Electricity/Traffic/Weather likely appear in pretraining corpora; report as in-domain"
+
+  E2_leakage_control:
+    question: "Is the measured accuracy genuine zero-shot performance?"
+    replicates: ["fev-bench leakage policy", "TiRex-2 leakage-free variants (-g, -f)",
+                 "Energy and AI 100914 (2026) leakage-controlled chronology"]
+    synthetic_suite: {length: 4096, seeds: [0, 1, 2, 3, 4], horizons: [24, 168], n_windows: 20,
+                      n_per_family: 10}   # 8-process suite + 14 families x 10 series, per seed
+    models: [ci-proto, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2,
+             seasonal-naive, naive, autotheta]
+    prospective:
+      description: "Ember daily prices, 23 markets: 2026 temporal hold-out and post-release (after 2026-11-12)"
+      holdout_start: "2026-01-01"
+      start: "2026-11-13"
+      horizons: [1, 7]
+    disclosure: "request per-task overlap report from Continuous Intelligence (fev-bench form)"
+
+  E3_electricity_prices:
+    question: "How does ci-proto compare for electricity price forecasting, point and probabilistic?"
+    replicates: ["Lin & T., Energy and AI 100914 (2026)", "Miseta et al., Energy and AI 100886 (2026)"]
+    daily_23_markets:
+      data: ember_daily
+      period: ["2015-01-01", "2025-12-31"]
+      horizons: [1, 7, 30]
+      splits: {train_end: "2022-12-31", validation: ["2023-01-01", "2023-12-31"],
+               test: ["2024-01-01", "2025-12-31"]}
+      origins: daily
+      step: 1                 # test origins every day (730 per market and horizon)
+      val_step: 3             # validation (context selection) origins every third day
+      context_days: [30, 90, 180, 365, 1095, full]   # 1095/full exploit ci-proto's long context
+      refit: never            # TSFMs: context only; LEAR/GBM/N-BEATS: one pre-test refit; LEAR-recal: daily
+      models: [ci-proto, ci-proto-cohort, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2,
+               lear, lear-recal, gbm-quantile, nbeats, autoets, autotheta,
+               seasonal-naive, naive, historical-mean]
+      lear_lags_days: [1, 2, 3, 4, 5, 6, 7, 14, 21, 28]
+      metrics: {point: [MAE, RMSE, sMAPE], probabilistic: [CRPS, WQL, COV80, IS80]}
+      tests:
+        dm: {loss: [abs, sq], hac: bartlett, lag: h-1, hln: true, multiplicity: holm, supplementary: bh}
+        mcs: {alpha: 0.10, statistic: Tmax, reps: 1000}
+      robustness: [by_year, by_quarter, rolling_90d_step_30d, p50_vs_mean]
+    intraday_3_markets:
+      # Licensed EPEX-DE / N2EX-UK / NEMS-SG replaced by Ember hourly day-ahead prices (CC BY 4.0)
+      markets: {DE: Germany.csv, GB: United Kingdom.csv, ES: Spain.csv}
+      period: ["2019-01-01", "2025-12-31"]
+      horizons_steps: [4, 24, 40]      # paper's 4 / 40 steps plus the day-ahead 24 h
+      grid_stride: 16                  # 24, 88, ..., 2008 (32 contexts) instead of all 507 step-4 values
+      test_step: 24                    # one origin per day
+      splits: {tune: ["2020-01-01", "2023-12-31"], test: ["2024-01-01", "2024-12-31"],
+               robustness: ["2025-01-01", "2025-12-31"]}
+      embargo: L+H
+      context_grid: epf_grid   # 24..2048 step 4 (selected on validation MAE) + ci-proto full history
+      models: [ci-proto, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2,
+               lear, lear-recal, nbeats, seasonal-naive, naive]
+      seasonal_naive_lag: {hourly: 168, half_hourly: 336}
+      metrics: [MAE, CRPS, COV80]
+      tests: {dm: true, mcs: {alpha: 0.10}}
+
+  E4_covariates_calendar:
+    question: "How much do calendar features and known/past covariates add, and how robust is that gain to covariate noise?"
+    replicates: ["fev-bench covariate tasks", "ci-proto walkthrough (bike sharing)",
+                 "Applied Energy 410 (2026) 127532 (SolarFM) exogenous design"]
+    datasets: [bike_sharing_uci, beijing_air_quality]   # GEFCom2014 needs registration; Beijing: 12 stations
+    horizons: [24, 168]
+    n_windows: 52            # weekly origins over the last year
+    conditions:
+      C0: {calendar: false, future: [], past: []}
+      C1: {calendar: true,  future: [], past: []}
+      C2: {calendar: true,  future: [holiday, workingday], past: []}
+      C3: {calendar: true,  future: [holiday, workingday], past: [temp, humidity, windspeed]}
+      C4: {calendar: true,  future: [holiday, workingday, temp_actual], past: [humidity, windspeed]}
+      C5: {inherit: C4, future_noise_sigma_multiplier: [0.5, 1.0, 5.0]}
+    categorical_variant: {future: [daytype_x_hour], categorical_future: [0]}
+    models: [ci-proto, chronos-2, tirex-2, timesfm-3, timesfm-2.5, tirex, moirai-2, seasonal-naive]
+    metrics: [MASE, SQL, WQL, COV80]
+
+  E5_context_scaling:
+    question: "Does accuracy keep improving up to the 2M+ context, at what cost, and does a long context hurt after regime breaks?"
+    replicates: ["S-Mamba lookback study (Neurocomputing 619, 2025)", "context sweep, Energy and AI 100914 (2026)",
+                 "exhaustive context search, Energy and AI 100886 (2026)",
+                 "context inertia under non-stationarity (Neurocomputing, 2026)"]
+    long_series:
+      data: uci_household_power     # 1-min, ~2.07M observations
+      contexts: pow2                # 64 ... 2,097,152; standard checkpoint <=16,384, long beyond
+      horizons: [60, 1440]
+      n_origins: 20                 # last 20 days, one origin per day at 00:00
+      models: [ci-proto, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2, seasonal-naive]
+      metrics: [MASE, SQL, COV80, latency_s, peak_memory_mb]
+    regime_breaks:
+      data: synthetic_suite
+      contexts: [256, 1024, 4096, 16384, 65536]
+      break_position: 0.75          # origins placed 1..30 days after the break
+      days_after_break: [1, 2, 3, 5, 7, 10, 14, 21, 30]
+      seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+      models: [ci-proto, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2, seasonal-naive]
+      metrics: [MASE, SQL]
+
+  E6_data_scarcity:
+    question: "With little local history, does zero-shot ci-proto beat supervised models trained on the same data?"
+    replicates: ["Zheng et al., Water Research X 30 (2026) 100469"]
+    data: beijing_multisite_air_quality   # 12 stations, hourly, PM2.5 (public UCI)
+    train_period: ["2014-03-01", "2016-02-29"]
+    test_period:  ["2016-03-01", "2017-02-28"]
+    horizons_steps: [1, 3, 6, 12, 24, 48]
+    input_window: 120
+    ratios: [0.2, 0.4, 0.6, 0.8, 1.0]
+    subset_mode: contiguous_blocks       # four seasonal blocks
+    ci_proto_contexts: [120, matched_to_ratio, full]
+    models: [ci-proto, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2,
+             lstm, patchtst, nbeats, gbm-quantile, seasonal-naive]
+    metrics: [RMSE, MAE, R2, peak_RMSE_p90, CRPS]
+    repeats: 3
+
+  E7_ablations_robustness:
+    question: "Which inference components drive ci-proto's accuracy, and how robust is it to missing data?"
+    replicates: ["component ablations of S-Mamba / RecMamba / FSMamba (Neurocomputing, KBS)", "TiRex-2 ablations"]
+    task_subset: fev_bench_stratified_30   # 30 tasks stratified by domain and covariate presence
+    tta_flags: [postprocess, tta_diff, tta_running_totals, tta_sign_flip, target_encode_categoricals,
+                clip_nonnegative, integer_round, calendar_covariates, bfloat16]
+    modes: [joint, cohort, independent]
+    missing_data: {rates: [0.0, 0.1, 0.25, 0.5], patterns: [random, block], block_len: season}
+    metrics: [SQL, MASE, COV80]
+    datasets: [synthetic_suite, ember_daily, ETTh1, beijing_air_quality, bike]
+    models: [ci-proto, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2, seasonal-naive]
+
+  E8_efficiency:
+    question: "What are the latency, throughput and memory costs relative to attention-based TSFMs?"
+    replicates: ["S-Mamba efficiency study (Neurocomputing 619, 2025)", "TiRex-2 constant per-patch cost"]
+    contexts: [512, 2048, 8192, 16384, 65536, 262144, 1048576, 2097152]
+    horizons: [64, 320]
+    batch_sizes: [1, 32, 256]
+    devices: [cpu, cuda]
+    ci_proto_backends: [mamba3, torch]
+    repeats: 10
+    warmup: 3
+    models: [ci-proto, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2]
+    report: [median_latency_s, p95_latency_s, series_per_s, peak_memory_mb]
+
+  E9_volatility_negative_control:
+    optional: true
+    question: "Does ci-proto add value where TSFMs have failed (daily realised volatility)?"
+    replicates: ["Zhong, Fu & Zhu, Finance Research Letters 110 (2026) 110606"]
+    target: abs_daily_return
+    data: "FRED daily closes (4 US equity indices, 10 FX rates, WTI/Brent/Henry Hub) -> data/equities.csv"
+    horizon: 1
+    years: [2023, 2024, 2025]
+    models: [ci-proto, chronos-2, timesfm-3, timesfm-2.5, tirex-2, tirex, moirai-2, har-rv, seasonal-naive, naive]
+    metrics: [RMSE, QLIKE]
+    tests: {dm: true, mcs: {alpha: 0.10}}
+
+  E10_gift_eval:
+    question: "Does ci-proto's zero-shot accuracy hold on GIFT-Eval (97 configurations), which it has not been submitted to?"
+    replicates: ["GIFT-Eval (Aksu et al., 2024), official splits and gluonts metrics via envs/gifteval"]
+    # ci-proto is new on GIFT-Eval; Chronos-2 / TiRex-2 / Seasonal Naive are re-run to check the harness
+    # against their official result files; every other model comes from the official files.
+    models: [ci-proto, chronos-2, tirex-2, seasonal-naive]
+
+# CPU-sized settings for a single workstation or laptop (python experiments/eXX.py --profile laptop).
+# Same protocols, fewer origins/contexts/models; results land in results/<experiment>/laptop/.
+profiles:
+  laptop:
+    E1_general_benchmarks:
+      suites: [ltsf]
+      ltsf_datasets: [ETTh1, ETTh2, ETTm1, ETTm2]
+      horizons: [96, 336]
+      lookbacks: [512, 2048]
+      stride: 96
+      models: [ci-proto, chronos-2, seasonal-naive]
+    E2_leakage_control:
+      seeds: [0, 1]
+      length: 4096
+      n_windows: 10
+      models: [ci-proto, chronos-2, seasonal-naive, naive]
+    E3_electricity_prices:
+      horizons: [1, 7, 30]
+      step: 14
+      context_days: [365, full]
+      phases: [test]
+      intraday: false
+      models: [ci-proto, chronos-2, lear, seasonal-naive, naive]
+    E4_covariates_calendar:
+      horizons: [24]
+      n_windows: 26
+      models: [ci-proto, chronos-2, seasonal-naive]
+    E5_context_scaling:
+      contexts: [256, 1024, 4096, 16384, 65536, 262144]
+      horizons: [60]
+      n_origins: 5
+      break_contexts: [256, 1024, 4096, 16384]
+      models: [ci-proto, chronos-2, seasonal-naive]
+    E6_data_scarcity:
+      ratios: [0.2, 0.6, 1.0]
+      repeats: 1
+      origin_step: 168
+      models: [ci-proto, chronos-2, gbm-quantile, seasonal-naive]
+    E7_ablations_robustness:
+      n_windows: 10
+      use_ember: true
+      models: [ci-proto, seasonal-naive]
+    E8_efficiency:
+      contexts: [512, 2048, 8192, 32768]
+      batch_sizes: [1, 32]
+      devices: [cpu]
+      repeats: 5
+      warmup: 1
+      models: [ci-proto, chronos-2]
+
+  # Minutes-long run over every model and code path on the GPU (validates wrappers before the paper run).
+  smoke:
+    E10_gift_eval:
+      max_configs: 3
+    E1_general_benchmarks:
+      suites: [ltsf, fev]
+      ltsf_datasets: [ETTh1]
+      horizons: [96]
+      lookbacks: [512]
+      stride: 1440
+      fev_tasks: tasks_mini
+      fev_max_tasks: 3
+    E5_context_scaling:
+      contexts: [1024, 32768]
+      horizons: [60]
+      n_origins: 2
+      break_contexts: [1024]
+      break_seeds: [0]
+      break_days: [1]
+    E6_data_scarcity:
+      ratios: [0.2]
+      repeats: 1
+      origin_step: 2160
+      max_steps: 20
+    E7_ablations_robustness:
+      n_windows: 2
+      datasets: [synthetic_suite, ember_daily]
+      flags: [tta_diff]
+      rates: [0.0, 0.25]
+    E8_efficiency:
+      contexts: [2048, 32768]
+      batch_sizes: [1, 32]
+      devices: [cuda, cpu]
+      repeats: 2
+      warmup: 1
+    E9_volatility_negative_control:
+      years: [2025]
+      step: 60
+    E4_covariates_calendar:
+      horizons: [24]
+      n_windows: 2
+    E2_leakage_control:
+      seeds: [0]
+      n_windows: 2
+      n_per_family: 2
+      horizons: [24]
+      prospective_horizons: [1]
+    E3_electricity_prices:
+      horizons: [1, 7]
+      step: 90
+      val_step: 90
+      context_days: [90, full]
+      grid_stride: 256
+      test_step: 2400
+      val_step_b: 2400
+      horizons_b: [24]

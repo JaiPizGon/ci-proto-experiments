@@ -1,0 +1,20 @@
+# Full experiment runs (Linux + CUDA GPU recommended). Pin exact versions in the paper's appendix.
+-r requirements-core.txt
+
+# model under study
+continuousintelligence>=0.1.1          # ci-proto; pulls torch, einops, huggingface-hub, Mamba-3 kernels
+huggingface_hub>=1.0
+
+# competing foundation models
+chronos-forecasting>=2.2               # Chronos-2 (amazon/chronos-2)
+tirex-ts                               # TiRex (NX-AI/TiRex)
+tirex2 @ git+https://github.com/NX-AI/tirex-2
+timesfm @ git+https://github.com/google-research/timesfm   # TimesFM 2.5 (torch)
+uni2ts>=2.0                            # Moirai 2.0
+gluonts
+
+# baselines and benchmark harnesses
+statsforecast>=2.0
+neuralforecast>=3.0
+lightgbm>=4.0
+fev>=0.6

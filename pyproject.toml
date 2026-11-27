@@ -1,0 +1,36 @@
+[project]
+name = "ci-proto-experiments"
+version = "0.2.0"
+description = "Experiment suite for an article evaluating the ci-proto time-series foundation model"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "numpy>=1.26,<3",
+    "pandas>=2.2,<4",
+    "scipy>=1.11",
+    "scikit-learn>=1.4",
+    "pyyaml>=6",
+    "matplotlib>=3.8",
+    "pyarrow>=15",
+    "huggingface-hub>=1,<3",
+    "continuousintelligence>=0.1.1",   # ci-proto (pulls torch)
+]
+
+[project.optional-dependencies]
+chronos = ["chronos-forecasting>=2.2"]          # Chronos-2 comparator
+stats = ["statsforecast>=2.0", "lightgbm>=4.0"]  # AutoETS/AutoTheta/MSTL, LightGBM quantiles
+neural = ["neuralforecast>=3.0"]                 # N-BEATS, LSTM, PatchTST supervised baselines
+bench = ["fev>=0.8"]                             # fev-bench harness (E1 full profile)
+# competing foundation models that share ci-proto's torch (Moirai-2 lives in envs/moirai: uni2ts pins torch 2.4)
+fm = [
+    "tirex-ts[cuda]>=1.4",   # [cuda]: xLSTM sLSTM kernels (E8 vendor path; accuracy runs use the torch backend)
+    "timesfm @ git+https://github.com/google-research/timesfm@918df02c9d366b2145bc5876135fa2131d3ed2a6",
+    "tirex-2 @ git+https://github.com/NX-AI/tirex-2@e45ec1057391344821f80725ab56e2cb6596759f",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]

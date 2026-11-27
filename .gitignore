@@ -1,0 +1,13 @@
+# environments
+.venv/
+envs/*/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# large / generated
+data/
+results/
+lightning_logs/
+*.zip
+# unsubmitted manuscript
+paper/
